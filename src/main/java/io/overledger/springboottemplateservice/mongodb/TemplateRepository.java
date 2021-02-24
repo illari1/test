@@ -6,9 +6,10 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
-public interface TemplateRepository extends ReactiveMongoRepository<TemplateDocument, UUID> {
+public interface TemplateRepository extends ReactiveMongoRepository<Subscription, UUID> {
 
-    Mono<TemplateDocument> findByTemplateField(String templateField);
-    Flux<TemplateDocument> findAllByTemplateField(String templateField);
+
+    Mono<Subscription> findByOnline(Boolean online);
+    Mono<Subscription> findByDlt(String dlt);
 
 }

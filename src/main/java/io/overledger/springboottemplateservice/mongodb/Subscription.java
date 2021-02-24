@@ -1,10 +1,12 @@
 package io.overledger.springboottemplateservice.mongodb;
 
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.List;
 import java.util.UUID;
 
 @Document
@@ -13,9 +15,12 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @NoArgsConstructor
 @AllArgsConstructor
-public class TemplateDocument {
+public class Subscription {
 
     @Id
-    UUID id;
-    String templateField;
+    private UUID id;
+    private Boolean online;
+    private String dlt;
+    private List<String> addresses;
+
 }

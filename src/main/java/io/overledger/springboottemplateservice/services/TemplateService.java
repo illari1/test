@@ -1,16 +1,17 @@
 package io.overledger.springboottemplateservice.services;
 
-import io.overledger.springboottemplateservice.dto.TemplateRequest;
-import io.overledger.springboottemplateservice.dto.TemplateResponse;
+import io.overledger.springboottemplateservice.dto.AddressTrackingRequestDetails;
+import io.overledger.springboottemplateservice.dto.AddressTrackingResponse;
 import io.overledger.springboottemplateservice.exceptions.TemplateException;
-import io.overledger.springboottemplateservice.mongodb.TemplateDocument;
+import io.overledger.springboottemplateservice.mongodb.Subscription;
 import io.overledger.springboottemplateservice.mongodb.TemplateRepository;
 import io.overledger.springboottemplateservice.rabbitmq.TemplatePublishGateway;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import java.util.List;
+
 import java.util.UUID;
 
 @Service
@@ -21,57 +22,55 @@ public class TemplateService {
     TemplateRepository templateRepository;
     TemplatePublishGateway templatePublishGateway;
 
-    public Mono<TemplateResponse> postStuff(TemplateRequest templateRequest) {
-        log.info(String.format("Validating request: %s.", templateRequest.toString()));
-        if (templateRequest.getTemplateField() == null) {
-            throw new TemplateException("The request is missing the required 'templateField' field.");
-        }
-        if (templateRequest.getTemplateField().equals("How are you?")) {
-            return Mono.just(new TemplateResponse("Always peachy!"));
-        }
+    public Mono<AddressTrackingResponse> subscribe(AddressTrackingRequestDetails addressTrackingRequestDetails) {
 
-        // Publishes to the Queue. If you run the same service again, with the Channel Handler enabled,
-        // you can comment out the 'saveToDatabase' function below as the ChannelHandler will do that instead.
-        publishToQueue(templateRequest);
+        log.info(String.format("Validating request: %s.", addressTrackingRequestDetails.toString()));
+        saveToDatabase(addressTrackingRequestDetails, true);
+        AddressTrackingResponse addressTrackingResponse = AddressTrackingResponse.builder()
+                .addresses(addressTrackingRequestDetails.getAddresses())
+                .dlt(addressTrackingRequestDetails.getDlt())
+                .online(true)
+                .build();
 
-        // Saves to the database. Comment this out if you want to test the Consumer functionality, as the TemplateChannelHandler
-        // is used to save to the database.
-        saveToDatabase(templateRequest);
 
-        List<TemplateDocument> templateMessages = this.templateRepository
-                .findAllByTemplateField(templateRequest.getTemplateField())
-                .collectList()
-                .block();
-        if (templateMessages.size() == 5)
-            return Mono.just(new TemplateResponse("42"));
-
-        TemplateResponse templateResponse = new TemplateResponse();
-        templateResponse.setTemplateField(templateRequest.getTemplateField());
-
-        return Mono.just(templateResponse);
+        return Mono.just(addressTrackingResponse);
     }
 
-    public Mono<TemplateDocument> getStuff(String templatePathVariable) {
+    public Flux<Subscription> getSubscriptions() {
         return this.templateRepository
-                .findByTemplateField(templatePathVariable)
-                .switchIfEmpty(Mono.error(new TemplateException("The document was not found.")));
+                .findAll();
     }
-
+/*
     private void publishToQueue(TemplateRequest templateRequest) {
         log.info("Publishing the request to the queue.");
         this.templatePublishGateway
                 .templatePublishRequest(
                         templateRequest,
-                        templateRequest.getTemplateField(),
+                        templateRequest.getId(),
                         System.currentTimeMillis(),
                         templateRequest.getClass().getName()
                 );
     }
+    */
 
-    public void saveToDatabase(TemplateRequest templateRequest) {
-        log.info("Saving the message to the database.");
+
+    public void saveToDatabase(AddressTrackingRequestDetails addressTrackingRequestDetails, boolean subscribe) {
+        log.info("Saving the subscription to the database.");
         this.templateRepository
-                .save(new TemplateDocument(UUID.randomUUID(), templateRequest.getTemplateField()))
+                .save(new Subscription(UUID.randomUUID(), subscribe, addressTrackingRequestDetails.getDlt(),
+                        addressTrackingRequestDetails.getAddresses()))
                 .subscribe(result -> log.info(String.valueOf(result)));
     }
+
+    public void unsubscribe(UUID subscriptionId) {
+
+        Mono<Subscription> subscription = templateRepository.findById(subscriptionId)
+                .switchIfEmpty((Mono.error(new TemplateException("The document was not found."))));
+
+        log.info("updating the subscription to the database.");
+        this.templateRepository.save(new Subscription(subscriptionId, false, subscription.block().getDlt(),
+                    subscription.block().getAddresses()))
+                    .subscribe(result -> log.info(String.valueOf(result)));
+    }
+
 }
