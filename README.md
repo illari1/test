@@ -23,8 +23,8 @@ Spring Boot app to maintain a subscription record about these addresses, disable
 }
 2.- GET localhost:8080/operations/v1    ----> get all the subscriptions
   response example:
-  [
-      {
+  
+  [    {
           "id": "52d54d59-8994-42e1-90ff-4640de60c9e9",
           "online": false,
           "dlt": "Bitcoin",
